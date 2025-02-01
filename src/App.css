@@ -1,0 +1,25 @@
+/* src/App.css */
+.App {
+  text-align: center;
+  padding: 20px;
+}
+
+#canvas {
+  width: 80%;
+  margin: 0 auto;
+  border: 1px solid #000;
+}
+
+button {
+  margin: 20px 0;
+  padding: 10px 20px;
+  font-size: 16px;
+}
+
+textarea {
+  width: 80%;
+  margin: 20px auto;
+  padding: 10px;
+  font-family: monospace;
+  font-size: 14px;
+}
