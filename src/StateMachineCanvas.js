@@ -1,50 +1,46 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { dia, shapes } from 'jointjs';
 
 const StateMachineCanvas = () => {
-  const [graph, setGraph] = useState(null);
+  const graphRef = useRef(new dia.Graph()); // Persistent graph instance
+  const paperRef = useRef(null); // Store paper instance to prevent recreation
   const [selectedStates, setSelectedStates] = useState([]); // Track multiple selected states
   const [condition, setCondition] = useState('');
-  const [stateAction, setStateAction] = useState('');
-  const [stateName, setStateName] = useState('');
 
   useEffect(() => {
-    const graphInstance = new dia.Graph();
-    setGraph(graphInstance); // Set graph to state
+    if (!paperRef.current) { // Ensure initialization runs only once
+      paperRef.current = new dia.Paper({
+        el: document.getElementById('canvas'),
+        model: graphRef.current,
+        width: 800,
+        height: 600,
+        gridSize: 10,
+        drawGrid: true,
+        linkPinning: false,
+      });
 
-    // Create paper (the rendering context for the canvas)
-    const paperInstance = new dia.Paper({
-      el: document.getElementById('canvas'),
-      model: graphInstance,
-      width: 800,
-      height: 600,
-      gridSize: 10,
-      drawGrid: true,
-      linkPinning: false,
-    });
+      // Listen for click events on cells (states)
+      paperRef.current.on('cell:pointerdown', (cellView) => {
+        if (cellView.model.isElement()) {
+          const selectedCell = cellView.model;
 
-    // Listen for click events on cells (states)
-    paperInstance.on('cell:pointerdown', (cellView) => {
-      if (cellView.model.isElement()) {
-        const selectedCell = cellView.model;
+          setSelectedStates((prevStates) => {
+            const isAlreadySelected = prevStates.includes(selectedCell);
 
-        // Make sure to only select a state if it's not already in the selectedStates
-        const isAlreadySelected = selectedStates.includes(selectedCell);
-        if (isAlreadySelected) {
-          // If already selected, remove it
-          setSelectedStates(selectedStates.filter((state) => state !== selectedCell));
-          selectedCell.attr('body/fill', 'lightblue'); // Reset state color
-        } else {
-          // Add to selected states if the limit of 2 is not reached
-          if (selectedStates.length < 2) {
-            setSelectedStates((prevStates) => [...prevStates, selectedCell]);
-            selectedCell.attr('body/fill', 'lightgreen'); // Highlight selected state
-          }
+            if (isAlreadySelected) {
+              selectedCell.attr('body/fill', 'lightblue'); // Reset color
+              return prevStates.filter((state) => state !== selectedCell);
+            } else if (prevStates.length < 2) {
+              selectedCell.attr('body/fill', 'lightgreen'); // Highlight selection
+              return [...prevStates, selectedCell];
+            }
+
+            return prevStates; // If max selection reached, do nothing
+          });
         }
-      }
-    });
-
-  }, [selectedStates]);
+      });
+    }
+  }, []); // Empty dependency array ensures this runs only once
 
   const addStateBox = () => {
     const rect = new shapes.standard.Rectangle();
@@ -52,25 +48,13 @@ const StateMachineCanvas = () => {
     const randomY = Math.floor(Math.random() * 400);
 
     rect.position(randomX, randomY);
-    rect.resize(100, 60); // Adjust size for both name and action
+    rect.resize(100, 60);
     rect.attr({
-      body: {
-        fill: 'lightblue',
-      },
-      label: {
-        text: stateName || 'State ' + (graph.getElements().length + 1),
-        fontSize: 14,
-        fill: 'black',
-      },
-      action: { // New attribute for state action (output)
-        text: stateAction,
-        fontSize: 12,
-        fill: 'black',
-        y: 30, // Position action below state name
-      },
+      body: { fill: 'lightblue' },
+      label: { text: 'State ' + (graphRef.current.getElements().length + 1), fontSize: 14, fill: 'black' },
     });
 
-    rect.addTo(graph);
+    rect.addTo(graphRef.current);
   };
 
   const addTransition = () => {
@@ -84,35 +68,30 @@ const StateMachineCanvas = () => {
     const link = new shapes.standard.Link();
     link.source(source);
     link.target(target);
-    link.attr({
-      line: {
-        stroke: 'black',
-        strokeWidth: 2,
-      },
-      label: {
-        text: condition,
-        fontSize: 12,
-        fill: 'black',
-        fontWeight: 'bold', // Make condition stand out more
-        ref: 'line', // Position label relative to the line (transition arrow)
-        refX: '50%',
-        refY: '50%',
-        textAnchor: 'middle',
-      },
-    });
-    link.addTo(graph);
+    link.labels([{
+      position: 0.5,
+      attrs: {
+        text: {
+          text: condition,
+          fontSize: 12,
+          fill: 'black',
+          fontWeight: 'bold',
+        },
+        rect: {
+          fill: 'white',
+          stroke: 'black',
+          strokeWidth: 1,
+          refWidth: '120%',
+          refHeight: '120%'
+        }
+      }
+    }]);
+    link.attr({ line: { stroke: 'black', strokeWidth: 2 } });
+    link.addTo(graphRef.current);
     setCondition('');
-    setSelectedStates([]); // Reset selection after creating transition
-    source.attr('body/fill', 'lightblue'); // Reset source state color
-    target.attr('body/fill', 'lightblue'); // Reset target state color
-  };
-
-  const handleConditionChange = (e) => {
-    setCondition(e.target.value);
-  };
-
-  const handleStateActionChange = (e) => {
-    setStateAction(e.target.value);
+    setSelectedStates([]);
+    source.attr('body/fill', 'lightblue');
+    target.attr('body/fill', 'lightblue');
   };
 
   return (
@@ -131,40 +110,9 @@ const StateMachineCanvas = () => {
           </div>
         )}
 
-        <input
-          type="text"
-          placeholder="Transition Condition (e.g., `input_signal == 1`)"
-          value={condition}
-          onChange={handleConditionChange}
-        />
-
+        <input type="text" placeholder="Transition Condition" value={condition} onChange={(e) => setCondition(e.target.value)} />
         <button onClick={addTransition}>Add Transition</button>
       </div>
-
-      {selectedStates.length === 1 && (
-        <div>
-          <h4>Selected State: {selectedStates[0]?.attr('label/text')}</h4>
-          <label>
-            State Name (e.g., `STATE_IDLE`):
-            <input
-              type="text"
-              placeholder="State Name"
-              value={stateName}
-              onChange={(e) => setStateName(e.target.value)}
-            />
-          </label>
-
-          <label>
-            State Action (e.g., `output_signal = 1`):
-            <input
-              type="text"
-              placeholder="State Action"
-              value={stateAction}
-              onChange={handleStateActionChange}
-            />
-          </label>
-        </div>
-      )}
     </div>
   );
 };
