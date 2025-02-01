@@ -27,15 +27,17 @@ const StateMachineCanvas = () => {
     paperInstance.on('cell:pointerdown', (cellView) => {
       if (cellView.model.isElement()) {
         const selectedCell = cellView.model;
+
+        // Make sure to only select a state if it's not already in the selectedStates
         const isAlreadySelected = selectedStates.includes(selectedCell);
         if (isAlreadySelected) {
           // If already selected, remove it
           setSelectedStates(selectedStates.filter((state) => state !== selectedCell));
           selectedCell.attr('body/fill', 'lightblue'); // Reset state color
         } else {
-          // Add to selected states
+          // Add to selected states if the limit of 2 is not reached
           if (selectedStates.length < 2) {
-            setSelectedStates([...selectedStates, selectedCell]);
+            setSelectedStates((prevStates) => [...prevStates, selectedCell]);
             selectedCell.attr('body/fill', 'lightgreen'); // Highlight selected state
           }
         }
@@ -76,15 +78,9 @@ const StateMachineCanvas = () => {
       alert('Please select two states and provide a condition!');
       return;
     }
-  
+
     const [source, target] = selectedStates;
-  
-    // Ensure source and target are valid states in the graph
-    if (!source || !target || !graph.getCell(source.id) || !graph.getCell(target.id)) {
-      alert('Invalid states selected for transition!');
-      return;
-    }
-  
+
     const link = new shapes.standard.Link();
     link.source(source);
     link.target(target);
@@ -104,7 +100,6 @@ const StateMachineCanvas = () => {
         textAnchor: 'middle',
       },
     });
-  
     link.addTo(graph);
     setCondition('');
     setSelectedStates([]); // Reset selection after creating transition
