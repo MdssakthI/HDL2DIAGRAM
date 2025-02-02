@@ -6,6 +6,7 @@ const StateMachineCanvas = () => {
   const paperRef = useRef(null); // Store paper instance to prevent recreation
   const [selectedStates, setSelectedStates] = useState([]); // Track multiple selected states
   const [condition, setCondition] = useState('');
+  const [shapeType, setShapeType] = useState('rectangle'); // New state to track selected shape
 
   useEffect(() => {
     if (!paperRef.current) { // Ensure initialization runs only once
@@ -43,55 +44,78 @@ const StateMachineCanvas = () => {
   }, []); // Empty dependency array ensures this runs only once
 
   const addStateBox = () => {
-    const rect = new shapes.standard.Rectangle();
+    let shape;
     const randomX = Math.floor(Math.random() * 600);
     const randomY = Math.floor(Math.random() * 400);
 
-    rect.position(randomX, randomY);
-    rect.resize(100, 60);
-    rect.attr({
+    // Create the shape based on the selected type
+    if (shapeType === 'rectangle') {
+      shape = new shapes.standard.Rectangle();
+      shape.resize(100, 60); // Rectangle size
+    } else if (shapeType === 'circle') {
+      shape = new shapes.standard.Ellipse(); // Use Ellipse for circle
+      shape.resize(80, 80); // Circle size
+    }
+
+    shape.position(randomX, randomY);
+    shape.attr({
       body: { fill: 'lightblue' },
       label: { text: 'State ' + (graphRef.current.getElements().length + 1), fontSize: 14, fill: 'black' },
     });
 
-    rect.addTo(graphRef.current);
+    shape.addTo(graphRef.current);
   };
 
   const addTransition = () => {
-    if (selectedStates.length !== 2 || !condition) {
-      alert('Please select two states and provide a condition!');
+    if (selectedStates.length < 1 || selectedStates.length > 2) {
+      alert('Please select one or two states to create a transition!');
       return;
     }
 
-    const [source, target] = selectedStates;
+    const [source, target] = selectedStates.length === 2 ? selectedStates : [selectedStates[0], selectedStates[0]];
 
     const link = new shapes.standard.Link();
-    link.source(source);
-    link.target(target);
-    link.labels([{
-      position: 0.5,
-      attrs: {
-        text: {
-          text: condition,
-          fontSize: 12,
-          fill: 'black',
-          fontWeight: 'bold',
+
+    // Define anchors as specific points on the rectangle (e.g., left, right, top, bottom)
+    link.source(source, {
+      anchor: { name: 'perpendicular' }, // Makes the link start at a perpendicular point to the shape
+      offset: { x: 0, y: 0 },
+    });
+    link.target(target, {
+      anchor: { name: 'perpendicular' }, // Makes the link end at a perpendicular point to the shape
+      offset: { x: 0, y: 0 },
+    });
+
+    link.attr({
+      line: { stroke: 'black', strokeWidth: 2 },
+    });
+
+    if (condition.trim()) {
+      link.appendLabel({
+        attrs: {
+          text: {
+            text: condition,
+            fontSize: 12,
+            fill: 'black',
+            fontWeight: 'bold',
+            textAnchor: 'middle',
+            textVerticalAnchor: 'middle',
+          },
         },
-        rect: {
-          fill: 'white',
-          stroke: 'black',
-          strokeWidth: 1,
-          refWidth: '120%',
-          refHeight: '120%'
-        }
-      }
-    }]);
-    link.attr({ line: { stroke: 'black', strokeWidth: 2 } });
+        position: {
+          distance: 0.5,
+        },
+      });
+    }
+
+    link.router('manhattan');
     link.addTo(graphRef.current);
     setCondition('');
     setSelectedStates([]);
     source.attr('body/fill', 'lightblue');
-    target.attr('body/fill', 'lightblue');
+    if (target !== source) {
+      target.attr('body/fill', 'lightblue');
+    }
   };
 
   return (
@@ -101,16 +125,44 @@ const StateMachineCanvas = () => {
 
       <button onClick={addStateBox}>Add New State</button>
 
+      {/* Shape Selection UI */}
+      <div>
+        <h4>Select State Shape</h4>
+        <label>
+          <input
+            type="radio"
+            name="shapeType"
+            value="rectangle"
+            checked={shapeType === 'rectangle'}
+            onChange={() => setShapeType('rectangle')}
+          />
+          Rectangle
+        </label>
+        <label>
+          <input
+            type="radio"
+            name="shapeType"
+            value="circle"
+            checked={shapeType === 'circle'}
+            onChange={() => setShapeType('circle')}
+          />
+          Circle
+        </label>
+      </div>
+
       <div>
         <h4>Create Transition</h4>
-        {selectedStates.length === 2 && (
+        {selectedStates.length > 0 && (
           <div>
             <h5>Selected States for Transition</h5>
-            <p>{selectedStates[0]?.attr('label/text')} &rarr; {selectedStates[1]?.attr('label/text')}</p>
+            <p>
+              {selectedStates[0]?.attr('label/text')} 
+              {selectedStates.length === 2 ? ` → ${selectedStates[1]?.attr('label/text')}` : ' (self-loop)'}
+            </p>
           </div>
         )}
 
-        <input type="text" placeholder="Transition Condition" value={condition} onChange={(e) => setCondition(e.target.value)} />
+        <input type="text" placeholder="Transition Condition (optional)" value={condition} onChange={(e) => setCondition(e.target.value)} />
         <button onClick={addTransition}>Add Transition</button>
       </div>
     </div>
